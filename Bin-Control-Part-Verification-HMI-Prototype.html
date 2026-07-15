@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Operator HMI Prototype — Bin Control &amp; Part Verification</title>
+<style>
+  :root{
+    --steel:#2E4E68;
+    --steel-lt:#4A7797;
+    --amber:#C0761B;
+    --amber-lt:#E0A64C;
+    --paper:#F5F3EE;
+    --ink:#1B2530;
+    --muted:#6B7784;
+    --green:#3E9A5D;
+    --red:#C4432E;
+    --screen-bg:#121A20;
+    --screen-panel:#1B2731;
+    --screen-panel2:#233242;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; background:var(--paper); font-family:'Poppins',sans-serif; color:var(--ink); }
+  .mono{ font-family:'DejaVu Sans Mono','Liberation Mono',monospace; }
+
+  .page{ max-width:1040px; margin:0 auto; padding:30px 28px 44px; }
+  .kicker{ font-size:11px; letter-spacing:.14em; color:var(--amber); font-weight:700; }
+  h1{ font-size:23px; color:var(--steel); margin:6px 0 8px; font-weight:700; }
+  .lede{ font-size:12.5px; color:var(--muted); max-width:760px; line-height:1.5; margin-bottom:22px;}
+
+  .stage{ display:flex; gap:30px; align-items:flex-start; flex-wrap:wrap; }
+
+  /* device frame — simple, no decorative bezel chrome */
+  .frame{
+    background:#0B1116; border-radius:14px; padding:14px; box-shadow:0 14px 30px rgba(20,30,40,.22);
+    width:720px; max-width:100%;
+  }
+  .screen{
+    width:100%; aspect-ratio: 1024/600; background:var(--screen-bg); border-radius:5px; overflow:hidden;
+    position:relative; display:flex; flex-direction:column; color:#EDEFF1;
+  }
+
+  /* top status bar inside screen */
+  .topbar{
+    display:flex; align-items:center; gap:9px; padding:9px 16px;
+    background:var(--screen-panel); border-bottom:1px solid #0d151b; font-size:11px;
+  }
+  .statusdot{ width:10px; height:10px; border-radius:50%; box-shadow:0 0 6px currentColor; }
+  .statusdot.green{ background:var(--green); color:var(--green); }
+  .statusdot.amber{ background:var(--amber-lt); color:var(--amber-lt); }
+  .statusdot.red{ background:var(--red); color:var(--red); }
+  .topbar .sysname{ font-weight:700; letter-spacing:.03em; font-size:11px; }
+
+  .body-area{ flex:1; padding:18px 24px; display:flex; flex-direction:column; position:relative; }
+
+  /* generic bits */
+  .scr-title{ font-size:18px; font-weight:700; margin-bottom:3px; }
+  .scr-sub{ font-size:11px; color:#9BA7B2; margin-bottom:14px; }
+  .backlink{
+    font-size:11px; color:var(--amber-lt); cursor:pointer; margin-bottom:12px; display:inline-flex;
+    align-items:center; gap:6px; letter-spacing:.03em; font-weight:700;
+    background:rgba(224,166,76,.12); border:1.4px solid var(--amber-lt); border-radius:7px;
+    padding:6px 12px; width:fit-content; transition:.12s;
+  }
+  .backlink:hover{ background:var(--amber-lt); color:#1B2530; }
+  .backlink.disabled{
+    color:#5A6672; cursor:not-allowed; background:rgba(255,255,255,.03); border-color:#3a4652;
+  }
+  .backlink.disabled:hover{ background:rgba(255,255,255,.03); color:#5A6672; }
+
+  .modelgrid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .modelbtn{
+    background:var(--screen-panel2); border:1.5px solid #34495c; border-radius:7px; padding:12px 14px;
+    text-align:left; cursor:pointer; transition:.12s;
+  }
+  .modelbtn:hover{ border-color:var(--steel-lt); background:#2A3C4E; }
+  .modelbtn .pn{ font-family:'DejaVu Sans Mono','Liberation Mono',monospace; font-size:12.5px; color:var(--amber-lt); font-weight:700; }
+  .modelbtn .desc{ font-size:11.5px; color:#C7D0D8; margin-top:2px; }
+
+  .setup-row{ display:flex; gap:26px; margin:8px 0 20px; }
+  .stepper-block{ text-align:center; }
+  .stepper-label{ font-size:10px; color:#9BA7B2; letter-spacing:.07em; margin-bottom:7px; }
+  .stepper{ display:flex; align-items:center; gap:12px; }
+  .stepbtn{
+    width:38px; height:38px; border-radius:7px; background:var(--screen-panel2); border:1.5px solid #34495c;
+    color:#EDEFF1; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .stepbtn:hover{ background:#2A3C4E; }
+  .stepval{ font-family:'DejaVu Sans Mono','Liberation Mono',monospace; font-size:21px; min-width:82px; text-align:center; font-weight:700; }
+
+  .bigbtn{
+    background:var(--steel); color:#fff; border:none; border-radius:8px; padding:14px 18px; font-size:13.5px;
+    font-weight:700; letter-spacing:.02em; cursor:pointer; margin-top:auto;
+  }
+  .bigbtn:hover{ background:var(--steel-lt); }
+  .bigbtn.amber{ background:var(--amber); } .bigbtn.amber:hover{ background:var(--amber-lt); color:#1B2530; }
+  .bigbtn.green{ background:var(--green); } .bigbtn.green:hover{ background:#4EB975; }
+  .bigbtn.red{ background:var(--red); } .bigbtn.red:hover{ background:#D95943; }
+
+  /* counting screen */
+  .countwrap{ display:flex; gap:22px; align-items:center; flex:1; }
+  .ring{ position:relative; width:130px; height:130px; flex:0 0 auto; }
+  .ring svg{ width:100%; height:100%; transform:rotate(-90deg); }
+  .ring .num{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .ring .num b{ font-size:30px; line-height:1; font-family:'DejaVu Sans Mono','Liberation Mono',monospace; }
+  .ring .num span{ font-size:9px; color:#9BA7B2; margin-top:2px; }
+  .countinfo{ flex:1; }
+  .countinfo .pn{ font-family:'DejaVu Sans Mono','Liberation Mono',monospace; font-size:15px; color:var(--amber-lt); font-weight:700; }
+  .countinfo .binid{ font-size:11.5px; color:#9BA7B2; margin-top:3px; }
+  .scanrow{ display:flex; gap:12px; margin-top:14px; }
+
+  .demo-tools{ position:absolute; right:8px; bottom:6px; }
+  .demo-tools button{
+    font-size:8.5px; letter-spacing:.03em; font-family:'DejaVu Sans Mono','Liberation Mono',monospace;
+    background:rgba(255,255,255,.06); color:#7C8A96; border:1px dashed #435362; border-radius:4px; padding:4px 6px; cursor:pointer;
+  }
+  .demo-tools button:hover{ color:#C7D0D8; border-color:#7C8A96; }
+
+  /* what's-happening panel — scan illustration + explanation, reserves its own row so it never covers the title */
+  .toast{
+    background:transparent; border:1px solid transparent; color:#BEEBD1; font-size:11px; line-height:1.45;
+    border-radius:7px; padding:0; min-height:64px; display:flex; align-items:center; gap:0;
+    opacity:0; margin-bottom:4px; transition:opacity .18s ease; overflow:hidden;
+  }
+  .toast.show{
+    background:#0E3625; border-color:#2D6B47; padding:8px 14px 8px 8px; opacity:1; margin-bottom:12px; gap:12px;
+  }
+  .toast.show.wrong{ background:#3A1512; border-color:#7A2E24; color:#F2C3BB; }
+  .toast b{ color:#fff; }
+  .toast .msg{ flex:1; }
+
+  /* barcode-scan illustration */
+  .scanillus{ flex:0 0 auto; width:104px; height:52px; }
+  .scanillus svg{ width:100%; height:100%; display:block; overflow:visible; }
+  .scanillus .card{ fill:#1B2731; stroke:#3a4f61; stroke-width:1.6; transition:stroke .2s; }
+  .scanillus .bar{ fill:#9BA7B2; }
+  .scanillus .lens{ fill:#0B1116; stroke:#5c7488; stroke-width:1.2; }
+  .scanillus .beam{ opacity:0; }
+  .scanillus .mark{ opacity:0; font-size:16px; font-weight:700; font-family:'DejaVu Sans Mono','Liberation Mono',monospace; }
+  .scanillus.play .beam{ animation:beamsweep .55s ease-in-out; }
+  .scanillus.play.ok .card{ animation:flashok .7s ease-in-out .3s; }
+  .scanillus.play.bad .card{ animation:flashbad .7s ease-in-out .3s; }
+  .scanillus.play .mark{ animation:markfade .8s ease-in-out .3s; }
+  .scanillus.play.ok .mark{ fill:#3E9A5D; }
+  .scanillus.play.bad .mark{ fill:#C4432E; }
+  @keyframes beamsweep{
+    0%{ transform:translateX(0); opacity:0; }
+    12%{ opacity:1; }
+    85%{ opacity:1; }
+    100%{ transform:translateX(-70px); opacity:0; }
+  }
+  @keyframes flashok{ 0%,100%{ stroke:#3a4f61; } 45%{ stroke:#3E9A5D; } }
+  @keyframes flashbad{ 0%,100%{ stroke:#3a4f61; } 45%{ stroke:#C4432E; } }
+  @keyframes markfade{ 0%,100%{ opacity:0; transform:translateY(3px); } 45%{ opacity:1; transform:translateY(0); } }
+
+  /* alert overlay */
+  .alertlayer{
+    position:absolute; inset:0; background:rgba(30,10,8,.94); display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center; padding:26px;
+  }
+  .alertlayer .icon{ font-size:36px; color:var(--red); margin-bottom:6px; }
+  .alertlayer h2{ color:#FF8A73; font-size:18px; margin:0 0 8px; }
+  .alertlayer .detail{ font-size:12px; color:#E8C9C2; margin-bottom:4px; }
+  .alertlayer .pn{ font-family:'DejaVu Sans Mono','Liberation Mono',monospace; font-weight:700; }
+
+  /* printing */
+  .printwrap{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
+  .spinner{ width:40px; height:40px; border-radius:50%; border:4px solid #2A3C4E; border-top-color:var(--amber-lt); animation:spin 0.9s linear infinite; margin-bottom:14px; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  /* label confirm */
+  .labelcard{
+    background:#fff; color:#111; border-radius:6px; padding:14px 16px; width:270px; margin:8px 0 14px;
+    font-family:'DejaVu Sans Mono','Liberation Mono',monospace; font-size:11px; line-height:1.75;
+    border:2px dashed #999;
+  }
+  .labelcard .lrow{ display:flex; justify-content:space-between; }
+  .labelcard .lrow b{ color:#000; }
+  .future-row{
+    padding:7px 10px; border:1px dashed #435362; border-radius:6px; font-size:10px; color:#7C8A96;
+    display:flex; align-items:center; gap:8px; margin-bottom:14px;
+  }
+  .future-row .dot{ width:6px; height:6px; border-radius:50%; background:#435362; flex:0 0 auto; }
+
+  /* right side note — short, single block */
+  .sidenote{ flex:1; min-width:270px; font-size:12px; color:var(--ink); line-height:1.65; }
+  .sidenote h3{ font-size:12.5px; color:var(--steel); margin-bottom:8px; }
+  .sidenote ul{ margin:0 0 14px; padding-left:16px; }
+  .sidenote .rule{
+    border-left:3px solid var(--amber); background:#FBF9F4; padding:10px 12px; font-size:11px; color:var(--muted);
+  }
+  .sidenote .rule b{ color:var(--ink); }
+
+  .footer-note{ font-size:9px; color:var(--muted); margin-top:26px; border-top:1px solid #D8D3C8; padding-top:10px; line-height:1.5; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="kicker mono">FE-SV-INT-02</div>
+  <h1>Operator HMI — interactive prototype</h1>
+  <p class="lede">A simplified click-through of the touchscreen the operator uses at the station: pick the model, set count &amp; bin, scan, confirm the label. The green button simulates a real scan and explains what it's standing in for.</p>
+
+  <div class="stage">
+    <div class="frame">
+      <div class="screen" id="screen"><!-- rendered by JS --></div>
+    </div>
+
+    <div class="sidenote">
+      <h3 class="mono">HOW TO USE THIS</h3>
+      <ul>
+        <li>Tap a model, set target qty &amp; bin, then start.</li>
+        <li>Tap <b>SIMULATE SCAN</b> to count parts up to target.</li>
+        <li>The small dashed button tests a wrong-part scan.</li>
+      </ul>
+      <div class="rule"><b>Rule:</b> one part number per bin, strictly enforced. A wrong-part scan is rejected without resetting the count.</div>
+    </div>
+  </div>
+
+  <div class="footer-note mono">FE-SV-INT-02 · INTERNAL — NOT FOR CLIENT DISTRIBUTION · illustrative only, exact panel/layout depends on the hardware still open in the BOM.</div>
+</div>
+
+<script>
+const MODELS = [
+  { pn:'VA414-A5770', desc:'Hose Assy Suction', target:12 },
+  { pn:'VA412-A4850', desc:'LH Bracket Assy', target:20 },
+  { pn:'VA401-A5080', desc:'Flange Shaft Seal', target:15 },
+  { pn:'VA414-A7050', desc:'SH End Fitting', target:18 },
+];
+const WRONG_PN = 'VA402-X9999';
+
+let state = {
+  screen: 'home',   // home | setup | scanning | alert | printing | confirm
+  model: null,
+  target: 12,
+  binNum: 1,
+  count: 0,
+  alertScanned: null,
+};
+let toastMsg = null;   // string | null — the "what just happened" explanation
+let scanFx = null;     // 'ok' | 'bad' | null — drives the barcode-scan illustration
+let fxTimer = null;
+
+function scanIllustrationSvg(fx){
+  const cls = fx ? `play ${fx}` : '';
+  const mark = fx === 'bad' ? '✕' : '✓';
+  return `<div class="scanillus ${cls}">
+    <svg viewBox="0 0 104 52">
+      <rect class="card" x="4" y="8" width="48" height="36" rx="5"/>
+      <rect class="bar" x="10" y="14" width="2" height="24"/>
+      <rect class="bar" x="14" y="14" width="1" height="24"/>
+      <rect class="bar" x="17" y="14" width="3" height="24"/>
+      <rect class="bar" x="23" y="14" width="1.5" height="24"/>
+      <rect class="bar" x="27" y="14" width="2" height="24"/>
+      <rect class="bar" x="31" y="14" width="1" height="24"/>
+      <rect class="bar" x="34" y="14" width="3" height="24"/>
+      <rect class="bar" x="39" y="14" width="1" height="24"/>
+      <rect class="bar" x="42" y="14" width="2" height="24"/>
+      <rect class="bar" x="46" y="14" width="1.5" height="24"/>
+      <text class="mark" x="53" y="20">${mark}</text>
+      <rect x="66" y="10" width="30" height="32" rx="6" fill="#233242" stroke="#3a4f61" stroke-width="1.6"/>
+      <circle class="lens" cx="70" cy="26" r="4.5"/>
+      <rect class="beam" x="60" y="12" width="3" height="28" rx="1.5" fill="#FF6B52"/>
+    </svg>
+  </div>`;
+}
+
+function fmtBin(n){ return 'BIN-' + String(n).padStart(2,'0'); }
+
+function statusDotClass(){
+  if (state.screen === 'alert') return 'red';
+  if (state.screen === 'printing') return 'amber';
+  return 'green';
+}
+function statusLabel(){
+  if (state.screen === 'alert') return 'LINE STOPPED';
+  if (state.screen === 'printing') return 'PRINTING';
+  return 'RUNNING';
+}
+
+function topbar(){
+  return `<div class="topbar">
+    <div class="statusdot ${statusDotClass()}"></div>
+    <div class="sysname mono">FACTORYEYE · BIN CONTROL &nbsp;·&nbsp; ${statusLabel()}</div>
+  </div>`;
+}
+
+function toastHtml(){
+  if (!toastMsg) return `<div class="toast">${scanIllustrationSvg(null)}</div>`;
+  const wrongClass = scanFx === 'bad' ? 'wrong' : '';
+  return `<div class="toast show ${wrongClass}">${scanIllustrationSvg(scanFx)}<div class="msg">${toastMsg}</div></div>`;
+}
+
+function render(){
+  const el = document.getElementById('screen');
+  let html = topbar();
+  let body = '';
+
+  if (state.screen === 'home'){
+    body = `<div class="body-area">
+      <div class="scr-title">Select model</div>
+      <div class="scr-sub">Which part is running on this line right now.</div>
+      <div class="modelgrid">
+        ${MODELS.map((m,i)=>`<div class="modelbtn" onclick="selectModel(${i})">
+          <div class="pn mono">${m.pn}</div>
+          <div class="desc">${m.desc}</div>
+        </div>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  else if (state.screen === 'setup'){
+    body = `<div class="body-area">
+      <div class="backlink" onclick="goHome()">&larr; change model</div>
+      <div class="scr-title">${state.model.pn} <span style="color:#9BA7B2;font-weight:400;font-size:12px;">— ${state.model.desc}</span></div>
+      <div class="scr-sub">Set the target count and bin.</div>
+      <div class="setup-row">
+        <div class="stepper-block">
+          <div class="stepper-label mono">TARGET QTY</div>
+          <div class="stepper">
+            <div class="stepbtn" onclick="adjustTarget(-1)">–</div>
+            <div class="stepval">${state.target}</div>
+            <div class="stepbtn" onclick="adjustTarget(1)">+</div>
+          </div>
+        </div>
+        <div class="stepper-block">
+          <div class="stepper-label mono">BIN ID</div>
+          <div class="stepper">
+            <div class="stepbtn" onclick="adjustBin(-1)">–</div>
+            <div class="stepval">${fmtBin(state.binNum)}</div>
+            <div class="stepbtn" onclick="adjustBin(1)">+</div>
+          </div>
+        </div>
+      </div>
+      <button class="bigbtn" style="width:200px;" onclick="startScanning()">CONFIRM &amp; START →</button>
+    </div>`;
+  }
+
+  else if (state.screen === 'scanning' || state.screen === 'alert'){
+    const pct = Math.min(100, Math.round((state.count/state.target)*100));
+    const r = 54, c = 2*Math.PI*r;
+    const dash = c * (pct/100);
+    body = `<div class="body-area">
+      <div class="backlink ${state.count>0?'disabled':''}" ${state.count>0?'title="Finish or reset this bin before changing model"':'onclick="goHome()"'}>&larr; change model</div>
+      <div class="scr-title">Scan into ${fmtBin(state.binNum)}</div>
+      <div class="scr-sub">Place part, check it, then scan.</div>
+      ${toastHtml()}
+      <div class="countwrap">
+        <div class="ring">
+          <svg viewBox="0 0 130 130">
+            <circle cx="65" cy="65" r="${r}" fill="none" stroke="#2A3C4E" stroke-width="11"/>
+            <circle cx="65" cy="65" r="${r}" fill="none" stroke="#E0A64C" stroke-width="11"
+              stroke-dasharray="${dash} ${c}" stroke-linecap="round"/>
+          </svg>
+          <div class="num"><b>${state.count}/${state.target}</b><span>COUNTED</span></div>
+        </div>
+        <div class="countinfo">
+          <div class="pn mono">${state.model.pn}</div>
+          <div class="binid">${state.model.desc} · ${fmtBin(state.binNum)}</div>
+          <div class="scanrow">
+            <button class="bigbtn green" onclick="simulateScan(true)">SIMULATE SCAN</button>
+          </div>
+        </div>
+      </div>
+      <div class="demo-tools">
+        <button onclick="simulateScan(false)">test: wrong-part scan</button>
+      </div>
+    </div>`;
+
+    if (state.screen === 'alert'){
+      body += `<div class="alertlayer">
+        <div class="icon">⛔</div>
+        <h2>WRONG PART — LINE STOPPED</h2>
+        <div class="detail">Expected: <span class="pn">${state.model.pn}</span></div>
+        <div class="detail">Scanned: <span class="pn">${state.alertScanned}</span></div>
+        <div class="detail" style="margin-top:6px;color:#C7A79E;">Rejected. Count stays at ${state.count}/${state.target}.</div>
+        <button class="bigbtn red" style="margin-top:16px;" onclick="acknowledgeAlert()">ACKNOWLEDGE &amp; RESUME</button>
+      </div>`;
+    }
+  }
+
+  else if (state.screen === 'printing'){
+    body = `<div class="body-area">
+      <div class="printwrap">
+        <div class="spinner"></div>
+        <div class="scr-title" style="font-size:14px;">Target reached — printing label…</div>
+        <div class="scr-sub">${state.model.pn} · ${fmtBin(state.binNum)} · Qty ${state.target}</div>
+      </div>
+    </div>`;
+  }
+
+  else if (state.screen === 'confirm'){
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0,10);
+    body = `<div class="body-area">
+      <div class="scr-title">Label printed — apply to bin</div>
+      <div class="scr-sub">Affix to ${fmtBin(state.binNum)}, then confirm.</div>
+      <div class="labelcard">
+        <div class="lrow"><span>PART NO.</span><b>${state.model.pn}</b></div>
+        <div class="lrow"><span>QTY</span><b>${state.target}</b></div>
+        <div class="lrow"><span>DATE</span><b>${dateStr}</b></div>
+        <div class="lrow"><span>SHIFT</span><b>B</b></div>
+        <div class="lrow"><span>SERIAL</span><b>#${String(Math.abs(state.binNum*137+state.target)).padStart(5,'0')}</b></div>
+      </div>
+      <div class="future-row"><div class="dot"></div>Operator ID capture (fingerprint) — planned, not active.</div>
+      <button class="bigbtn amber" style="width:240px;" onclick="confirmLabel()">✓ YES — LABEL APPLIED</button>
+    </div>`;
+  }
+
+  el.innerHTML = html + body;
+}
+
+function showScanFeedback(msg, fx){
+  toastMsg = msg;
+  scanFx = fx;
+  render();
+  clearTimeout(fxTimer);
+  fxTimer = setTimeout(()=>{ toastMsg = null; scanFx = null; render(); }, fx === 'bad' ? 900 : 2200);
+}
+
+function goHome(){
+  state.model = null;
+  state.count = 0;
+  state.screen = 'home';
+  toastMsg = null;
+  scanFx = null;
+  render();
+}
+function selectModel(i){
+  state.model = MODELS[i];
+  state.target = MODELS[i].target;
+  state.binNum = 1;
+  state.count = 0;
+  state.screen = 'setup';
+  render();
+}
+function adjustTarget(d){ state.target = Math.max(1, Math.min(99, state.target+d)); render(); }
+function adjustBin(d){ state.binNum = Math.max(1, Math.min(99, state.binNum+d)); render(); }
+function startScanning(){ state.count = 0; state.screen = 'scanning'; render(); }
+
+function simulateScan(correct){
+  if (!correct){
+    showScanFeedback(`<b>What just happened:</b> reader sent barcode "${WRONG_PN}" to the controller → does <b>not</b> match ${state.model.pn} → scan rejected, line stops.`, 'bad');
+    setTimeout(()=>{
+      state.alertScanned = WRONG_PN;
+      state.screen = 'alert';
+      toastMsg = null;
+      scanFx = null;
+      render();
+    }, 750);
+    return;
+  }
+  state.count++;
+  showScanFeedback(`<b>What just happened:</b> reader sent barcode "${state.model.pn}" to the controller → matched → count now ${state.count}/${state.target}.`, 'ok');
+  if (state.count >= state.target){
+    setTimeout(()=>{
+      state.screen = 'printing';
+      toastMsg = null;
+      scanFx = null;
+      render();
+      setTimeout(()=>{ state.screen='confirm'; render(); }, 1300);
+    }, 900);
+  }
+}
+function acknowledgeAlert(){ state.screen = 'scanning'; render(); }
+function confirmLabel(){
+  state.binNum++;
+  state.count = 0;
+  state.screen = 'setup';
+  render();
+}
+
+render();
+</script>
+</body>
+</html>
