@@ -50,11 +50,11 @@
   .statusdot.red{ background:var(--red); color:var(--red); }
   .topbar .sysname{ font-weight:700; letter-spacing:.03em; font-size:11px; }
 
-  .body-area{ flex:1; padding:18px 24px; display:flex; flex-direction:column; position:relative; }
+  .body-area{ flex:1; padding:16px 24px; display:flex; flex-direction:column; position:relative; }
 
   /* generic bits */
   .scr-title{ font-size:18px; font-weight:700; margin-bottom:3px; }
-  .scr-sub{ font-size:11px; color:#9BA7B2; margin-bottom:14px; }
+  .scr-sub{ font-size:11px; color:#9BA7B2; margin-bottom:8px; }
   .backlink{
     font-size:11px; color:var(--amber-lt); cursor:pointer; margin-bottom:12px; display:inline-flex;
     align-items:center; gap:6px; letter-spacing:.03em; font-weight:700;
@@ -95,6 +95,26 @@
   .bigbtn.amber{ background:var(--amber); } .bigbtn.amber:hover{ background:var(--amber-lt); color:#1B2530; }
   .bigbtn.green{ background:var(--green); } .bigbtn.green:hover{ background:#4EB975; }
   .bigbtn.red{ background:var(--red); } .bigbtn.red:hover{ background:#D95943; }
+  .bigbtn.ghost{ background:var(--screen-panel2); border:1.5px solid #34495c; color:#EDEFF1; }
+  .bigbtn.ghost:hover{ background:#2A3C4E; }
+  .bigbtn:disabled{ opacity:.35; cursor:not-allowed; }
+  .bigbtn:disabled:hover{ background:inherit; }
+
+  /* auto-run (batch) status bar */
+  .batchbar{
+    margin-top:6px; padding:6px 12px; background:var(--screen-panel2); border:1px solid #34495c; border-radius:7px;
+    font-size:10.5px; color:#C7D0D8; display:flex; align-items:center; gap:10px;
+  }
+  .batchbar b{ color:#fff; }
+  .batchbar .label{ flex:0 0 auto; }
+  .batchbar .barwrap{ flex:1; height:5px; background:#0d151b; border-radius:3px; overflow:hidden; }
+  .batchbar .barfill{ height:100%; background:var(--amber-lt); transition:width .25s ease; }
+  .batchbar .stopbtn{
+    flex:0 0 auto; font-size:9.5px; font-family:'DejaVu Sans Mono','Liberation Mono',monospace;
+    background:rgba(196,67,46,.18); color:#F2B4A8; border:1px solid var(--red); border-radius:5px;
+    padding:5px 9px; cursor:pointer;
+  }
+  .batchbar .stopbtn:hover{ background:var(--red); color:#fff; }
 
   /* counting screen */
   .countwrap{ display:flex; gap:22px; align-items:center; flex:1; }
@@ -106,19 +126,23 @@
   .countinfo{ flex:1; }
   .countinfo .pn{ font-family:'DejaVu Sans Mono','Liberation Mono',monospace; font-size:15px; color:var(--amber-lt); font-weight:700; }
   .countinfo .binid{ font-size:11.5px; color:#9BA7B2; margin-top:3px; }
-  .scanrow{ display:flex; gap:12px; margin-top:14px; }
+  .scanrow{ display:flex; gap:12px; margin-top:10px; }
 
-  .demo-tools{ position:absolute; right:8px; bottom:6px; }
-  .demo-tools button{
-    font-size:8.5px; letter-spacing:.03em; font-family:'DejaVu Sans Mono','Liberation Mono',monospace;
-    background:rgba(255,255,255,.06); color:#7C8A96; border:1px dashed #435362; border-radius:4px; padding:4px 6px; cursor:pointer;
+  /* test/demo control — deliberately styled distinct from the real station buttons
+     (dashed border, muted fill) but sized and labelled to be easy to notice and read */
+  .testscan{
+    margin-top:8px; display:inline-flex; align-items:center; gap:7px; font-size:11.5px; font-weight:700;
+    letter-spacing:.02em; color:#C7D0D8; background:rgba(255,255,255,.05); border:1.5px dashed #6B7784;
+    border-radius:7px; padding:7px 14px; cursor:pointer; transition:.12s;
   }
-  .demo-tools button:hover{ color:#C7D0D8; border-color:#7C8A96; }
+  .testscan:hover{ background:rgba(255,255,255,.1); border-color:#9BA7B2; color:#fff; }
+  .testscan:disabled{ opacity:.35; cursor:not-allowed; }
+  .testscan:disabled:hover{ background:rgba(255,255,255,.05); border-color:#6B7784; color:#C7D0D8; }
 
   /* what's-happening panel — scan illustration + explanation, reserves its own row so it never covers the title */
   .toast{
     background:transparent; border:1px solid transparent; color:#BEEBD1; font-size:11px; line-height:1.45;
-    border-radius:7px; padding:0; min-height:64px; display:flex; align-items:center; gap:0;
+    border-radius:7px; padding:0; min-height:56px; display:flex; align-items:center; gap:0;
     opacity:0; margin-bottom:4px; transition:opacity .18s ease; overflow:hidden;
   }
   .toast.show{
@@ -197,7 +221,7 @@
 <div class="page">
   <div class="kicker mono">FE-SV-INT-02</div>
   <h1>Operator HMI — interactive prototype</h1>
-  <p class="lede">A simplified click-through of the touchscreen the operator uses at the station: pick the model, set count &amp; bin, scan, confirm the label. The green button simulates a real scan and explains what it's standing in for.</p>
+  <p class="lede">A simplified click-through of the touchscreen the operator uses at the station: pick the model, set count &amp; bin, scan, confirm the label. Step through scans one at a time, or auto-run the rest of the current bin's count hands-free — the run always includes one deliberately wrong scan so you can see exactly how a bad part is caught.</p>
 
   <div class="stage">
     <div class="frame">
@@ -208,10 +232,10 @@
       <h3 class="mono">HOW TO USE THIS</h3>
       <ul>
         <li>Tap a model, set target qty &amp; bin, then start.</li>
-        <li>Tap <b>SIMULATE SCAN</b> to count parts up to target.</li>
-        <li>The small dashed button tests a wrong-part scan.</li>
+        <li>Tap <b>SIMULATE SCAN</b> to count parts one at a time, or <b>AUTO-RUN REMAINING</b> to fill the rest of this bin's count hands-free — its progress (e.g. 7/12) is the exact same count shown in the ring, never a different number.</li>
+        <li>Every auto-run includes exactly one wrong-part scan (at a random point) so you can see the catch — plus a small dashed button to test one wrong scan on demand.</li>
       </ul>
-      <div class="rule"><b>Rule:</b> one part number per bin, strictly enforced. A wrong-part scan is rejected without resetting the count.</div>
+      <div class="rule"><b>Rule:</b> one part number per bin, strictly enforced. A wrong-part scan is rejected without resetting the count. Auto-run only fills this bin's count — applying the printed label to the bin stays a manual, deliberate step.</div>
     </div>
   </div>
 
@@ -234,10 +258,12 @@ let state = {
   binNum: 1,
   count: 0,
   alertScanned: null,
+  batch: null,      // { total, done, wrongAt, wrongDone, running, binsCompleted } | null — auto-run state
 };
 let toastMsg = null;   // string | null — the "what just happened" explanation
 let scanFx = null;     // 'ok' | 'bad' | null — drives the barcode-scan illustration
 let fxTimer = null;
+let batchTimer = null; // setTimeout handle for the auto-run loop, so STOP can cancel it
 
 function scanIllustrationSvg(fx){
   const cls = fx ? `play ${fx}` : '';
@@ -289,6 +315,24 @@ function toastHtml(){
   return `<div class="toast show ${wrongClass}">${scanIllustrationSvg(scanFx)}<div class="msg">${toastMsg}</div></div>`;
 }
 
+// The auto-run progress bar always reads off state.count/state.target — the SAME
+// numbers shown in the count ring — so there is only ever one pair of "X/Y" numbers
+// on screen, never a separate batch-size counter that could drift out of sync with it.
+function batchBarHtml(){
+  const b = state.batch;
+  if (b.running){
+    const pct = state.target ? Math.round((state.count/state.target)*100) : 0;
+    return `<div class="batchbar">
+      <div class="label">AUTO-RUN <b>${state.count}/${state.target}</b>${b.wrongDone?' · 1 wrong-part scan flagged so far':''}</div>
+      <div class="barwrap"><div class="barfill" style="width:${pct}%;"></div></div>
+      <div class="stopbtn" onclick="stopBatch()">■ STOP</div>
+    </div>`;
+  }
+  return `<div class="batchbar">
+    <div class="label">${b.finishedNote || ''}</div>
+  </div>`;
+}
+
 function render(){
   const el = document.getElementById('screen');
   let html = topbar();
@@ -338,8 +382,11 @@ function render(){
     const pct = Math.min(100, Math.round((state.count/state.target)*100));
     const r = 54, c = 2*Math.PI*r;
     const dash = c * (pct/100);
+    const batchRunning = !!(state.batch && state.batch.running);
+    const backDisabled = state.count>0 || batchRunning;
+    const remaining = Math.max(0, state.target - state.count);
     body = `<div class="body-area">
-      <div class="backlink ${state.count>0?'disabled':''}" ${state.count>0?'title="Finish or reset this bin before changing model"':'onclick="goHome()"'}>&larr; change model</div>
+      <div class="backlink ${backDisabled?'disabled':''}" ${backDisabled?'title="Finish or reset this bin (and stop any auto-run) before changing model"':'onclick="goHome()"'}>&larr; change model</div>
       <div class="scr-title">Scan into ${fmtBin(state.binNum)}</div>
       <div class="scr-sub">Place part, check it, then scan.</div>
       ${toastHtml()}
@@ -356,12 +403,12 @@ function render(){
           <div class="pn mono">${state.model.pn}</div>
           <div class="binid">${state.model.desc} · ${fmtBin(state.binNum)}</div>
           <div class="scanrow">
-            <button class="bigbtn green" onclick="simulateScan(true)">SIMULATE SCAN</button>
+            <button class="bigbtn green" ${batchRunning?'disabled':''} onclick="simulateScan(true)">SIMULATE SCAN</button>
+            <button class="bigbtn ghost" ${(batchRunning||remaining<=0)?'disabled':''} onclick="startBatch()">▶ AUTO-RUN REMAINING (${remaining})</button>
           </div>
+          <button class="testscan" ${batchRunning?'disabled':''} onclick="simulateScan(false)">⚠ TEST: SIMULATE A WRONG-PART SCAN</button>
+          ${state.batch ? batchBarHtml() : ''}
         </div>
-      </div>
-      <div class="demo-tools">
-        <button onclick="simulateScan(false)">test: wrong-part scan</button>
       </div>
     </div>`;
 
@@ -372,7 +419,10 @@ function render(){
         <div class="detail">Expected: <span class="pn">${state.model.pn}</span></div>
         <div class="detail">Scanned: <span class="pn">${state.alertScanned}</span></div>
         <div class="detail" style="margin-top:6px;color:#C7A79E;">Rejected. Count stays at ${state.count}/${state.target}.</div>
-        <button class="bigbtn red" style="margin-top:16px;" onclick="acknowledgeAlert()">ACKNOWLEDGE &amp; RESUME</button>
+        ${batchRunning
+          ? `<div class="detail" style="margin-top:16px;color:#F2B4A8;">Auto-run will acknowledge and resume shortly…</div>`
+          : `<button class="bigbtn red" style="margin-top:16px;" onclick="acknowledgeAlert()">ACKNOWLEDGE &amp; RESUME</button>`
+        }
       </div>`;
     }
   }
@@ -390,6 +440,7 @@ function render(){
   else if (state.screen === 'confirm'){
     const now = new Date();
     const dateStr = now.toISOString().slice(0,10);
+    const batchRunning = !!(state.batch && state.batch.running);
     body = `<div class="body-area">
       <div class="scr-title">Label printed — apply to bin</div>
       <div class="scr-sub">Affix to ${fmtBin(state.binNum)}, then confirm.</div>
@@ -401,7 +452,10 @@ function render(){
         <div class="lrow"><span>SERIAL</span><b>#${String(Math.abs(state.binNum*137+state.target)).padStart(5,'0')}</b></div>
       </div>
       <div class="future-row"><div class="dot"></div>Operator ID capture (fingerprint) — planned, not active.</div>
-      <button class="bigbtn amber" style="width:240px;" onclick="confirmLabel()">✓ YES — LABEL APPLIED</button>
+      ${batchRunning
+        ? `<div class="detail" style="font-size:11px;color:#9BA7B2;">Auto-run will confirm this label and continue shortly…</div>`
+        : `<button class="bigbtn amber" style="width:240px;" onclick="confirmLabel()">✓ YES — LABEL APPLIED</button>`
+      }
     </div>`;
   }
 
@@ -416,7 +470,15 @@ function showScanFeedback(msg, fx){
   fxTimer = setTimeout(()=>{ toastMsg = null; scanFx = null; render(); }, fx === 'bad' ? 900 : 2200);
 }
 
+function stopBatchTimers(){
+  clearTimeout(batchTimer);
+  batchTimer = null;
+}
+
 function goHome(){
+  if (state.batch && state.batch.running) return; // link is disabled in this state anyway
+  stopBatchTimers();
+  state.batch = null;
   state.model = null;
   state.count = 0;
   state.screen = 'home';
@@ -425,6 +487,8 @@ function goHome(){
   render();
 }
 function selectModel(i){
+  stopBatchTimers();
+  state.batch = null;
   state.model = MODELS[i];
   state.target = MODELS[i].target;
   state.binNum = 1;
@@ -434,10 +498,23 @@ function selectModel(i){
 }
 function adjustTarget(d){ state.target = Math.max(1, Math.min(99, state.target+d)); render(); }
 function adjustBin(d){ state.binNum = Math.max(1, Math.min(99, state.binNum+d)); render(); }
-function startScanning(){ state.count = 0; state.screen = 'scanning'; render(); }
+function startScanning(){
+  stopBatchTimers();
+  state.batch = null;
+  state.count = 0;
+  state.screen = 'scanning';
+  render();
+}
 
-function simulateScan(correct){
-  if (!correct){
+// Core scan logic, shared by the manual SIMULATE SCAN button and the auto-run batch.
+// onDone (optional) fires once this scan's full sequence (including any bin-complete
+// print/confirm cycle, or an alert linger) has settled — used by the batch to chain
+// into the next scan. Manual single scans just omit it, matching the original behaviour.
+function doScan(isCorrect, onDone){
+  onDone = onDone || function(){};
+  const batchRunning = !!(state.batch && state.batch.running);
+
+  if (!isCorrect){
     showScanFeedback(`<b>What just happened:</b> reader sent barcode "${WRONG_PN}" to the controller → does <b>not</b> match ${state.model.pn} → scan rejected, line stops.`, 'bad');
     setTimeout(()=>{
       state.alertScanned = WRONG_PN;
@@ -445,27 +522,120 @@ function simulateScan(correct){
       toastMsg = null;
       scanFx = null;
       render();
+      if (batchRunning){
+        // linger on the alert screen so the "wrong part caught" moment is clearly visible,
+        // then auto-acknowledge and let the batch continue — a manual scan just waits for
+        // the operator to tap ACKNOWLEDGE & RESUME themselves.
+        setTimeout(()=>{
+          state.screen = 'scanning';
+          render();
+          onDone();
+        }, 1900);
+      }
     }, 750);
     return;
   }
+
   state.count++;
   showScanFeedback(`<b>What just happened:</b> reader sent barcode "${state.model.pn}" to the controller → matched → count now ${state.count}/${state.target}.`, 'ok');
   if (state.count >= state.target){
+    // Auto-run's job is only to fill this bin's count — the moment the target is
+    // reached, end the run here (state.count/state.target is what it was tracking,
+    // so there's nothing left to run) and hand back control for the label-confirm
+    // step, which stays a deliberate manual action in both manual and auto-run mode.
+    if (batchRunning) endBatchRun(true);
     setTimeout(()=>{
       state.screen = 'printing';
       toastMsg = null;
       scanFx = null;
       render();
-      setTimeout(()=>{ state.screen='confirm'; render(); }, 1300);
+      setTimeout(()=>{ state.screen = 'confirm'; render(); }, 1300);
     }, 900);
+    // onDone() is deliberately NOT called here — the batch (if any) is already over.
+  } else {
+    onDone();
   }
 }
-function acknowledgeAlert(){ state.screen = 'scanning'; render(); }
+
+function simulateScan(correct){
+  if (state.batch && state.batch.running) return; // buttons are disabled in this state anyway
+  doScan(correct);
+}
+
+function acknowledgeAlert(){
+  if (state.batch && state.batch.running) return;
+  state.screen = 'scanning';
+  render();
+}
 function confirmLabel(){
+  if (state.batch && state.batch.running) return;
   state.binNum++;
   state.count = 0;
   state.screen = 'setup';
   render();
+}
+
+// --- Auto-run (batch) mode: simulates the REMAINING scans needed to fill this bin,
+// hands-free — i.e. exactly state.target - state.count scans, the same numbers shown
+// in the count ring, so the auto-run progress never shows a different number from the
+// ring it's driving. Exactly one of those scans is deliberately wrong (never the very
+// first attempt), so a run always demonstrates what an incorrect-part catch looks like.
+// The run always stops the instant state.count reaches state.target — it fills one
+// bin's count and no more; applying the label stays a manual, deliberate step.
+function endBatchRun(reachedTarget){
+  if (!state.batch) return;
+  state.batch.running = false;
+  const wrongNote = state.batch.wrongDone ? ' · 1 flagged as wrong-part (caught correctly)' : '';
+  state.batch.finishedNote = reachedTarget
+    ? `Auto-run finished: ${state.count}/${state.target} scanned${wrongNote}.`
+    : `Auto-run stopped: ${state.count}/${state.target} scanned so far${wrongNote}.`;
+}
+
+function startBatch(){
+  if (state.batch && state.batch.running) return;
+  const remaining = state.target - state.count;
+  if (remaining <= 0) return; // nothing left to auto-run for this bin
+  let wrongAt = null; // the attempt NUMBER (1-based, counting wrong attempts too) that will be the deliberate wrong scan
+  if (remaining >= 3) wrongAt = 2 + Math.floor(Math.random()*(remaining-1));      // somewhere in [2, remaining] — never the very first attempt
+  else if (remaining === 2) wrongAt = 1 + Math.floor(Math.random()*2);            // [1, 2] — not enough room to avoid the first attempt
+  // remaining === 1: skip the forced wrong scan entirely, no room to demonstrate it without blocking the only scan needed
+  state.batch = {
+    wrongAt: wrongAt,
+    wrongDone: false,
+    running: true,
+    attempts: 0,
+    finishedNote: null,
+  };
+  render();
+  stopBatchTimers();
+  batchTimer = setTimeout(batchTick, 400);
+}
+
+function stopBatch(){
+  if (!state.batch || !state.batch.running) return;
+  endBatchRun(false);
+  stopBatchTimers();
+  render();
+}
+
+function batchTick(){
+  if (!state.batch || !state.batch.running) return;
+  if (state.count >= state.target){
+    // safety net — doScan() already ends the run the instant target is reached, so
+    // this normally never fires, but guards against the run somehow being re-armed
+    endBatchRun(true);
+    render();
+    return;
+  }
+  state.batch.attempts++;
+  const isWrong = (state.batch.wrongAt !== null && state.batch.attempts === state.batch.wrongAt && !state.batch.wrongDone);
+  if (isWrong) state.batch.wrongDone = true;
+  render();
+  doScan(!isWrong, function(){
+    if (state.batch && state.batch.running){
+      batchTimer = setTimeout(batchTick, 550);
+    }
+  });
 }
 
 render();
